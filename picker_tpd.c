@@ -1,16 +1,3 @@
-#include <math.h>
-
-#define PI  3.141592653589793238462643383279f
-#define PI2 6.283185307179586476925286766559f
-
-#define  DEF_MAX_BUFFER_SEC 5.0f
-#define  DEF_TIME_WINDOW    4.5f
-#define  DEF_TMX            0.019f
-
-#define  DEF_THRESHOLD_C1       0.015f
-#define  DEF_THRESHOLD_C2       0.01f
-#define  DEF_C1_HALF_THRESHOLD  0.006f
-
 #ifdef _OS2
 #define INCL_DOSMEMMGR
 #define INCL_DOSSEMAPHORES
@@ -38,7 +25,7 @@
 #include <recordtype.h>
 #include <picker_tpd.h>
 #include <picker_tpd_list.h>
-#include <picker_tpd_pmat.h>
+
 
 
 /* Functions prototype in this source file */
@@ -47,10 +34,7 @@ static void picker_tpd_lookup( void );
 static void picker_tpd_status( unsigned char, short, char * );
 static void picker_tpd_end( void );                /* Free all the local memory & close socket */
 
-static void TraceInfoInit( const TRACE2X_HEADER *, _TRACEINFO * );
-static void OperationInt( _TRACEINFO *, float *, float * const, const int );
-static void ModifyChanCode( TracePacket *, const char * const );
-static void SkipModifyChanCode( TracePacket *, const char * const );
+static void interpolate( TRACEINFO *, uint8_t *, int );
 
 static inline double get_mavg( const double, const double );
 
@@ -71,8 +55,8 @@ static char     OutRingName[MAX_RING_STR];  /* name of transport ring for i/o   
 static char     MyModName[MAX_MOD_STR];     /* speak as this module name/id      */
 static uint8_t  LogSwitch;                  /* 0 if no logfile should be written */
 static uint64_t HeartBeatInterval;          /* seconds between heartbeats        */
-static uint32_t MaxGapsThreashold;          /* */
-static uint16_t DriftCorrectThreshold;      /* seconds waiting for D.C. */
+static uint32_t MaxGapsThreshold;          /* */
+static uint16_t ReadySampleLength;      /* seconds waiting for D.C. */
 static uint16_t nLogo = 0;
 
 /* Things to look up in the earthworm.h tables with getutil.c functions
@@ -108,8 +92,9 @@ int main ( int argc, char **argv )
 	char   *lockfile;
 	int32_t lockfile_fd;
 
-	TRACEINFO   *traceptr;
-	TracePacket  tracebuffer;  /* message which is sent to share ring    */
+	uint8_t       *trace_buf;  /* message which is sent to share ring    */
+	TRACE2_HEADER *trh2;  /* message which is sent to share ring    */
+	TRACEINFO     *trace_info;
 
 /* Check command line arguments */
 	if ( argc != 2 ) {
@@ -161,6 +146,15 @@ int main ( int argc, char **argv )
 		OutRingName, OutRingKey
 	);
 
+/* Allocate the waveform buffer */
+	trace_buf = (uint8_t *)malloc(MAX_TRACEBUF_SIZ + sizeof(int32_t) * (MaxGapsThreshold + 1));
+	if ( trace_buf == NULL ) {
+		logit("e", "picker_tpd: Cannot allocate waveform buffer!\n");
+		exit(-1);
+	}
+/* Point to header and data portions of waveform message */
+	trh2 = (TRACE2_HEADER *)trace_buf;
+
 /* Force a heartbeat to be issued in first pass thru main loop */
 	timeLastBeat = time(&timeNow) - HeartBeatInterval - 1;
 
@@ -188,7 +182,7 @@ int main ( int argc, char **argv )
 			}
 
 		/* Get msg & check the return code from transport */
-			res = tport_getmsg(&InRegion, Getlogo, nLogo, &reclogo, &recsize, tracebuffer.msg, MAX_TRACEBUF_SIZ);
+			res = tport_getmsg(&InRegion, Getlogo, nLogo, &reclogo, &recsize, trace_buf, MAX_TRACEBUF_SIZ);
 
 		/* no more new messages */
 			if ( res == GET_NONE ) {
@@ -199,7 +193,7 @@ int main ( int argc, char **argv )
 			/* complain and try again */
 				sprintf(
 					Text, "Retrieved msg[%ld] (i%u m%u t%u) too big for Buffer[%ld]",
-					recsize, reclogo.instid, reclogo.mod, reclogo.type, sizeof(tracebuffer) - 1
+					recsize, reclogo.instid, reclogo.mod, reclogo.type, MAX_TRACEBUF_SIZ
 				);
 				picker_tpd_status( TypeError, ERR_TOOBIG, Text );
 				continue;
@@ -237,12 +231,10 @@ int main ( int argc, char **argv )
 					continue;
 				}
 
-				traceptr = TraListSearch( &tracebuffer.trh2x );
+				trace_info = ptpd_list_find( trh2->sta, trh2->chan, trh2->net, trh2->loc );
 
-				if ( traceptr == NULL ) {
-				/* Error when insert into the tree */
-					logit( "e", "picker_tpd: %s.%s.%s.%s insert into trace tree error, drop this trace.\n",
-						tracebuffer.trh2x.sta, tracebuffer.trh2x.chan, tracebuffer.trh2x.net, tracebuffer.trh2x.loc );
+				if ( trace_info == NULL ) {
+				/* This trace is not in the list */
 					continue;
 				}
 
@@ -259,7 +251,7 @@ int main ( int argc, char **argv )
 			 * If (1 < GapSize <= Gparm.MaxGap), data will be interpolated.
 			 * If (GapSize > Gparm.MaxGap), the picker will go into restart mode.
 			 */
-				double tmp_time = tracebuffer.trh2x.samprate * (tracebuffer.trh2x.starttime - traceptr->lasttime);
+				double tmp_time = trh2->samprate * (trh2->starttime - traceptr->lasttime);
 				int    gap_size;
 				if ( tmp_time < 0.0 )          /* Invalid. Time going backwards. */
 					gap_size = 0;
@@ -267,12 +259,16 @@ int main ( int argc, char **argv )
 					gap_size = (int)(tmp_time + 0.5);
 
 			/* Interpolate missing samples and prepend them to the current message */
-				if ( gap_size && (gap_size <= MaxGapsThreashold) ) {
-					Interpolate( Sta, TraceBuf, gap_size );
+				if ((gap_size > 1) && (gap_size <= MaxGapsThreshold) ) {
+					interpolate( trace_info, trace_buf, gap_size );
 				}
 			/* Announce large sample gaps */
-				else if ( gap_size > MaxGapsThreashold ) {
-					/* Placeholder */
+				else if ( gap_size > MaxGapsThreshold ) {
+				/* Placeholder */
+					logit(
+						"t", "picker_tpd: Found %d sample gaps. Restarting channel %s.%s.%s.%s\n",
+						gap_size, trace_info->sta, trace_info->chan, trace_info->net, trace_info->loc
+					);
 				}
 
 			/*
@@ -280,8 +276,8 @@ int main ( int argc, char **argv )
 			 * STAs and LTAs without picking.  Start picking again after a
 			 * specified number of samples has been processed.
 			 */
-				if ( Restart( Sta, &Gparm, Trace2Head->nsamp, GapSize ) ) {
-					for ( i = 0; i < tracebuffer.trh2x.nsamp; i++ )
+				if ( restart_tracing( trace_info, trh2->nsamp, gap_size ) ) {
+					for ( i = 0; i < trh2->nsamp; i++ )
 						Sample( TraceLong[i], Sta );
 				}
 				else {
@@ -531,27 +527,78 @@ static void picker_tpd_status( unsigned char type, short ierr, char *note )
 
 /*
 */
-static void TraceInfoInit( const TRACE2X_HEADER *trh2x, _TRACEINFO *traceptr )
+static void init_traceinfo( const TRACE2_HEADER *trh2, TRACEINFO *trace_info )
 {
-	traceptr->firsttime     = FALSE;
-	traceptr->readycount    = 0;
-	traceptr->lasttime      = 0.0;
-	traceptr->lastsample    = 0.0;
-	traceptr->average       = 0.0;
-	traceptr->delta         = 1.0 / trh2x->samprate;
-	traceptr->intsteps      = traceptr->delta * 20.0 / NaturalPeriod + 1.0 - 1.e-5;
-	traceptr->pmatrix       = PMatrixSearch( traceptr );
-	memset(traceptr->xmatrix, 0, sizeof(traceptr->xmatrix));
+	trace_info->firsttime     = FALSE;
+	trace_info->readycount    = 0;
+	trace_info->lastsample    = 0;
+	trace_info->lasttime      = 0.0;
+	trace_info->average       = 0.0;
+	trace_info->delta         = 1.0 / trh2->samprate;
+
 
 	return;
 }
 
 /*
+ * restart_tracing() Check for breaks in the time sequence of messages.
  *
+ *  Returns 1 if the picker is in restart mode
+ *          0 if the picker is not in restart mode
  */
-static inline double get_mavg( const double sample, const double average )
+
+static int restart_tracing( TRACEINFO *trace_info, int nsamp, int gaps )
 {
-	return average + 0.001 * (sample - average);
+	int result = 0;
+/*
+ * Begin a restart sequence. Initialize internal variables.
+ * Save the number of samples processed in restart mode.
+ */
+	if ( gaps > MaxGapsThreshold ) {
+		InitVar( Sta );
+		trace_info->readycount = nsamp;
+		result = 1;
+	}
+	else {
+	/* The restart sequence is over */
+		if ( trace_info->readycount >= ReadySampleLength ) {
+			result = 0;
+		}
+	/* The restart sequence is still in progress */
+		else {
+			trace_info->readycount += nsamp;
+			result = 1;
+		}
+	}
+
+	return result;
+}
+
+
+/*
+ * interpolate() Interpolate samples and insert them at the beginning of
+ *               the waveform.
+ */
+static void interpolate( TRACEINFO *trace_info, uint8_t *trace_buf, int gaps )
+{
+	int            i;
+	TRACE2_HEADER *trh2  = (TRACE2_HEADER *)trace_buf;
+	int32_t       *idata = (int32_t *)(trh2 + 1);
+	const double   delta = (double)(idata[0] - trace_info->lastsample) / gaps;
+	double         sum_delta;
+
+/* */
+	gaps--;
+	for ( i = trh2->nsamp - 1; i >= 0; i-- )
+		idata[i + gaps] = idata[i];
+
+	for ( i = 0, sum_delta = delta; i < gaps; i++, sum_delta += delta )
+		idata[i] = (int32_t)(trace_info->lastsample + sum_delta + 0.5);
+
+	trh2->nsamp    += gaps;
+	trh2->starttime = trace_info->lasttime + (1.0 / trh2->samprate);
+
+	return;
 }
 
 /*
@@ -665,91 +712,4 @@ double refine_arrival_time( TPD_QUEUE *t_queue, double delta_tpd )
 	}
 
 	return result_i * t_queue->delta;
-}
-
-/*
- *
- */
-
-
-/*
- *  inc_circular() - Move supplied pointer to the next buffer descriptor structure
- *                   in a circular way.
- *  argument:
- *    t_queue -
- *    pos     -
- *  returns:
- *
- */
-static unsigned int inc_circular( TPD_QUEUE *t_queue, unsigned int *pos )
-{
-	if ( ++(*pos) >= t_queue->max_elements )
-		*pos = 0;
-
-	return *pos;
-}
-
-/*
- *  dec_circular() - Move supplied pointer to the previous buffer descriptor structure
- *                   in a circular way.
- *  argument:
- *    t_queue -
- *    pos     -
- *  returns:
- *
- */
-static unsigned int dec_circular( TPD_QUEUE *t_queue, unsigned int *pos )
-{
-	if ( --(*pos) < 0 )
-		*pos = queue->max_elements - 1;
-
-	return *pos;
-}
-
-/*
- *  move_circular() -
- *  argument:
- *    t_queue -
- *    pos     -
- *    step    -
- *    drc     -
- *  returns:
- */
-static unsigned int move_circular( TPD_QUEUE *t_queue, unsigned int *pos, int step, const int drc )
-{
-	if ( step > t_queue->max_elements )
-		return *pos;
-
-/* Forward step */
-	if ( drc > 0 )
-		*pos = (*pos + step) % t_queue->max_elements;
-/* Backward step */
-	else
-		*pos = (*pos - step + t_queue->max_elements) % t_queue->max_elements;
-
-	return *pos;
-}
-
-/*
- *  dist_circular() -
- *  argument:
- *    t_queue -
- *    pos     -
- *    step    -
- *    drc     -
- *  returns:
- */
-static unsigned int dist_circular( TPD_QUEUE *t_queue, unsigned int *pos, int step, const int drc )
-{
-	if ( step > t_queue->max_elements )
-		return *pos;
-
-/* Forward step */
-	if ( drc > 0 )
-		*pos = (*pos + step) % t_queue->max_elements;
-/* Backward step */
-	else
-		*pos = (*pos - step + t_queue->max_elements) % t_queue->max_elements;
-
-	return *pos;
 }

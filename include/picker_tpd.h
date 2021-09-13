@@ -22,7 +22,6 @@
  */
 typedef struct {
     double  *entry;
-    double   delta;
     uint32_t first;
     uint32_t last;
     uint32_t max_elements;
@@ -33,18 +32,19 @@ typedef struct {
  * Station info related struct
  */
 typedef struct {
-	char sta[STA_CODE_LEN];   /* Site name (NULL-terminated) */
-	char net[NET_CODE_LEN];   /* Network name (NULL-terminated) */
-	char loc[LOC_CODE_LEN];   /* Location code (NULL-terminated) */
-	char chan[CHAN_CODE_LEN]; /* Component/channel code (NULL-terminated) */
+	char sta[TRACE2_STA_LEN];   /* Site name (NULL-terminated) */
+	char net[TRACE2_NET_LEN];   /* Network name (NULL-terminated) */
+	char loc[TRACE2_LOC_LEN];   /* Location code (NULL-terminated) */
+	char chan[TRACE2_CHAN_LEN]; /* Component/channel code (NULL-terminated) */
 /* */
-	uint8_t     padding;
-	uint8_t     firsttime;
-	uint16_t    readycount;
-	double      lasttime;
-	double      lastsample;
-	double      average;
-	double      delta;
+	uint8_t  padding;
+	uint8_t  firsttime;
+	uint16_t readycount;
+	uint32_t lastsample;
+	double   lasttime;
+	double   average;
+	double   delta;
+	double   cfactor;
 /* */
 	SAMPLE_CIRC_BUFFER tpd_buffer;
 } TRACEINFO;

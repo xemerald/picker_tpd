@@ -28,6 +28,6 @@ GetEventsFrom  INST_WILDCARD      MOD_WILDCARD    TYPE_TRACEBUF2
 # The local list for program that will be picked. By the way, the priority of local list
 # is higher than the one from remote data. And the layout should be like these example:
 #
-# PickSCNL  Station  Network  Channel  Location  Conv_Factor
-# PickSCNL  TEST     TW       HLZ      --        0.059816       # First example
+# PickSCNL  Station  Channel  Network  Location  Conv_Factor
+# PickSCNL  TEST     HLZ      TW       --        0.059816       # First example
 #

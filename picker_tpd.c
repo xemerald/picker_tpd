@@ -34,9 +34,9 @@ static void picker_tpd_lookup( void );
 static void picker_tpd_status( unsigned char, short, char * );
 static void picker_tpd_end( void );                /* Free all the local memory & close socket */
 
+static void init_traceinfo( const TRACE2_HEADER *, TRACEINFO * );
+static int  restart_tracing( TRACEINFO *, int, int );
 static void interpolate( TRACEINFO *, uint8_t *, int );
-
-static inline double get_mavg( const double, const double );
 
 /* Ring messages things */
 static  SHM_INFO  InRegion;      /* shared memory region to use for i/o    */
@@ -239,10 +239,12 @@ int main ( int argc, char **argv )
 				}
 
 			/* First time initialization */
-				if ( traceptr->firsttime || fabs(1.0/tracebuffer.trh2x.samprate - traceptr->delta) > FLT_EPSILON ) {
-					printf("picker_tpd: New SCNL(%s.%s.%s.%s) received, starting to trace!\n",
-						traceptr->sta, traceptr->chan, traceptr->net, traceptr->loc);
-					TraceInfoInit( &tracebuffer.trh2x, traceptr );
+				if ( trace_info->firsttime || fabs(1.0 / trh2->samprate - trace_info->delta) > FLT_EPSILON ) {
+					printf(
+						"picker_tpd: New SCNL(%s.%s.%s.%s) received, starting to trace!\n",
+						trace_info->sta, trace_info->chan, trace_info->net, trace_info->loc
+					);
+					init_traceinfo( trh2, trace_info );
 				}
 
 			/*
@@ -264,11 +266,12 @@ int main ( int argc, char **argv )
 				}
 			/* Announce large sample gaps */
 				else if ( gap_size > MaxGapsThreshold ) {
-				/* Placeholder */
+				/*  */
 					logit(
 						"t", "picker_tpd: Found %d sample gaps. Restarting channel %s.%s.%s.%s\n",
 						gap_size, trace_info->sta, trace_info->chan, trace_info->net, trace_info->loc
 					);
+					init_traceinfo( trh2, trace_info );
 				}
 
 			/*
@@ -278,10 +281,10 @@ int main ( int argc, char **argv )
 			 */
 				if ( restart_tracing( trace_info, trh2->nsamp, gap_size ) ) {
 					for ( i = 0; i < trh2->nsamp; i++ )
-						Sample( TraceLong[i], Sta );
+						ptpd_sample( , trace_info );
 				}
 				else {
-					PickRA( Sta, TraceBuf, &Gparm, &Ewh );
+					/* Placeholder */
 				}
 			/* Save time and amplitude of the end of the current message */
 				traceptr->lastsample = 0;
@@ -526,16 +529,38 @@ static void picker_tpd_status( unsigned char type, short ierr, char *note )
 }
 
 /*
-*/
+ * picker_tpd_end()  free all the local memory & close socket
+ */
+static void picker_tpd_end( void )
+{
+	tport_detach(&InRegion);
+	tport_detach(&OutRegion);
+	ptpd_list_end();
+
+	return;
+}
+
+/*
+ *
+ */
 static void init_traceinfo( const TRACE2_HEADER *trh2, TRACEINFO *trace_info )
 {
-	trace_info->firsttime     = FALSE;
-	trace_info->readycount    = 0;
-	trace_info->lastsample    = 0;
-	trace_info->lasttime      = 0.0;
-	trace_info->average       = 0.0;
-	trace_info->delta         = 1.0 / trh2->samprate;
-
+	trace_info->readycount = 0;
+	trace_info->lastsample = 0;
+	trace_info->lasttime   = trh2->starttime;
+	trace_info->delta      = 1.0 / trh2->samprate;
+	trace_info->avg        = 0.0;
+	trace_info->alpha      = exp(log(0.1) * trace_info->delta / DEF_TIME_WINDOW);
+	trace_info->bets       = 1.0 - exp(log(0.1) * trace_info->delta / 100.0);
+	trace_info->ldata      = 0.0;
+	trace_info->xdata      = 0.0;
+	trace_info->ddata      = 0.0;
+	trace_info->avg_noise  = 0.0;
+/* */
+	if ( (int)(trh2->samprate * DEF_MAX_BUFFER_SECONDS) > DEF_MAX_BUFFER_SAMPLES ) {
+		ptpd_circ_buf_free( &trace_info->tpd_buffer );
+		ptpd_circ_buf_init( &trace_info->tpd_buffer, trh2->samprate * DEF_MAX_BUFFER_SECONDS );
+	}
 
 	return;
 }
@@ -555,7 +580,6 @@ static int restart_tracing( TRACEINFO *trace_info, int nsamp, int gaps )
  * Save the number of samples processed in restart mode.
  */
 	if ( gaps > MaxGapsThreshold ) {
-		InitVar( Sta );
 		trace_info->readycount = nsamp;
 		result = 1;
 	}
@@ -599,117 +623,4 @@ static void interpolate( TRACEINFO *trace_info, uint8_t *trace_buf, int gaps )
 	trh2->starttime = trace_info->lasttime + (1.0 / trh2->samprate);
 
 	return;
-}
-
-/*
- * picker_tpd_end()  free all the local memory & close socket
- */
-static void picker_tpd_end( void )
-{
-	tport_detach(&InRegion);
-	tport_detach(&OutRegion);
-
-	return;
-}
-
-
-/*
- *
- */
-double compute_tpd( double sample, double sample_prev, double delta, double x_prev, double d_prev, double avg_noise_prev )
-{
-	const double alpha = exp(log(0.1) * delta / DEF_TIME_WINDOW);
-	double x_this, d_this, d_stable, avg_noise_this;
-	double result;
-
-	result = (sample - sample_prev) / delta;
-	x_this = alpha * x_prev + sample * sample;
-	d_this = alpha * d_prev + result * result;
-
-	avg_noise_this = avg_noise_prev + (1.0 - exp(log(0.1) * delta / 100.0)) * (sample * sample - avg_noise_prev);
-	d_stable = PI_2 * PI_2 * avg_noise_this * DEF_TIME_WINDOW / (delta * DEF_TMX * DEF_TMX);
-	result   = PI_2 * sqrt(x_this / (d_this + d_stable));
-
-	return result;
-}
-
-/*
- *
- */
-double find_delta_tpd_max( TPD_QUEUE *t_queue )
-{
-	int i;
-	int nsamp   = (int)(3.0 / t_queue->delta);
-	unsigned int pos = t_queue->last;
-	double       tpd_min = t_queue->entry[pos];
-
-	dec_circular( t_queue, &pos );
-	for ( i = 0; i < nsamp; i++, dec_circular( t_queue, &pos )) {
-		if ( t_queue->entry[pos] > 0. && t_queue->entry[pos] < tpd_min )
-			tpd_min = t_queue->entry[pos];
-	}
-
-	return t_queue->entry[t_queue->last] - tpd_min;
-}
-
-/*
- *
- */
-double refine_arrival_time( TPD_QUEUE *t_queue, double delta_tpd )
-{
-	int i, i_end, j;
-	int result_i = 0;
-
-	double       delta_thr;
-	const int    nsamp = (int)(1.0 / t_queue->delta);
-	unsigned int pos   = t_queue->last;
-
-/* 1st repick with delta_tpd */
-	i_end     = 3 * nsamp;
-	delta_thr = delta_tpd * 0.5;
-	dec_circular( t_queue, &pos );
-	for ( i = 0; i < i_end; i++, dec_circular( t_queue, &pos ) ) {
-		double _delta = t_queue->entry[t_queue->last] - t_queue->entry[pos];
-		if ( _delta > delta_thr ) {
-			result_i = i;
-			break;
-		}
-	/* Start to use the 2nd refine condition */
-		if ( i > (int)(nsamp * 0.15) && !result_i ) {
-			delta_thr = delta_tpd * 0.8;
-			result_i = i;
-		}
-	}
-
-/* 3rd repick by tpd derivative (max 1s) */
-	if ( result_i < (int)(t_queue->max_elements) ) {
-		for ( i = 0; i < nsamp; i++, dec_circular( t_queue, &pos ) ) {
-			double tpd1 = 0.0;
-			double tpd2 = 0.0;
-			double dtpd = 0.0;
-			unsigned int pos_1 = pos;
-			dec_circular( t_queue, &pos_1 );
-			if ( i < nsamp - 1 ) {
-				unsigned int pos_2 = pos_1;
-				dec_circular( t_queue, &pos_2 );
-				for ( j = 0; j < 3; j++, inc_circular( t_queue, &pos_1 ), inc_circular( t_queue, &pos_2 ) ) {
-					tpd1 += t_queue->entry[pos_2];
-					tpd2 += t_queue->entry[pos_1];
-				}
-				dtpd = (tpd2 - tpd1) / t_queue->delta / 3.0;
-			}
-			else {
-				tpd1 = t_queue->entry[pos_1];
-				tpd2 = t_queue->entry[pos];
-				dtpd = (tpd2 - tpd1) / t_queue->delta;
-			}
-		/* */
-			if ( dtpd < DEF_THRESHOLD_C2 ) {
-				result_i += i;
-				break;
-			}
-		}
-	}
-
-	return result_i * t_queue->delta;
 }

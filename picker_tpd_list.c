@@ -52,7 +52,7 @@ TRACEINFO *ptpd_list_find( const char *sta, const char *chan, const char *net, c
  */
 void ptpd_list_end( void )
 {
-	tdestroy((void *)Root, free_stainfo);
+	tdestroy((void *)Root, free_traceinfo);
 
 	return;
 }
@@ -67,12 +67,12 @@ void ptpd_list_walk( void (*action)(const void *, const VISIT, const int) )
 }
 
 /*
- * ptpd_list_total_station() -
+ * ptpd_list_total_traces() -
  */
-int ptpd_list_total_station( void )
+int ptpd_list_total_traces( void )
 {
 	TotalTraces = 0;
-	ptpd_list_walk( cal_total_traces );
+	ptpd_list_walk( calc_total_traces );
 
 	return TotalTraces;
 }
@@ -124,7 +124,7 @@ void *ptpd_list_root_reg( void *root )
 void ptpd_list_root_destroy( void *root )
 {
 	if ( root != (void *)NULL )
-		tdestroy(root, free_stainfo);
+		tdestroy(root, free_traceinfo);
 
 	return;
 }
@@ -175,7 +175,8 @@ static TRACEINFO *enrich_traceinfo_raw(
 	strcpy(trace_info->loc,  loc );
 	trace_info->cfactor = cfactor;
 /* */
-	trace_info->tpd_buffer.entry = NULL;
+	trace_info->firsttime = true;
+	ptpd_circ_buf_init( &trace_info->tpd_buffer, DEF_MAX_BUFFER_SAMPLES );
 
 	return trace_info;
 }
@@ -183,7 +184,7 @@ static TRACEINFO *enrich_traceinfo_raw(
 /*
  *
  */
-static void cal_total_traces( const void *nodep, const VISIT which, const int depth )
+static void calc_total_traces( const void *nodep, const VISIT which, const int depth )
 {
 	switch ( which ) {
 	case postorder:
@@ -227,8 +228,7 @@ static void free_traceinfo( void *node )
 {
 	TRACEINFO *trace_info = (TRACEINFO *)node;
 
-	if ( trace_info->tpd_buffer.entry != NULL )
-		free(trace_info->tpd_buffer.entry);
+	ptpd_circ_buf_free( &trace_info->tpd_buffer );
 	free(trace_info);
 
 	return;

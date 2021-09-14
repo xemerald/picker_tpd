@@ -6,15 +6,13 @@
 #include <trace_buf.h>
 
 /* Constants define */
-#define  PI     3.141592653589793238462643383279f
-#define  PI2    6.283185307179586476925286766559f
-#define  PI2_SQ 39.47841760435743447533796399951f
+#define PI  3.141592653589793238462643383279f
+#define PI2 6.283185307179586476925286766559f
 
 #define  DEF_MAX_BUFFER_SECONDS 5.0f
 #define  DEF_MAX_BUFFER_SAMPLES 500l
 #define  DEF_TIME_WINDOW        4.5f
 #define  DEF_TMX                0.019f
-#define  DEF_TMX_SQ             0.000361f
 
 #define  DEF_THRESHOLD_C1       0.015f
 #define  DEF_THRESHOLD_C2       0.01f

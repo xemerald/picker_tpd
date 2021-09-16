@@ -4,6 +4,8 @@
 #include <stdint.h>
 /* Earthworm header include */
 #include <trace_buf.h>
+/* */
+#include <picker_tpd_circ_buf.h>
 
 /* Constants define */
 #define  PI     3.141592653589793238462643383279f
@@ -16,20 +18,9 @@
 #define  DEF_TMX                0.019f
 #define  DEF_TMX_SQ             0.000361f
 
-#define  DEF_THRESHOLD_C1       0.015f
-#define  DEF_THRESHOLD_C2       0.01f
+#define  TRIGGER_THRESHOLD_C1   0.015f
+#define  TRIGGER_THRESHOLD_C2   0.01f
 #define  DEF_C1_HALF_THRESHOLD  0.006f
-
-/*
- *
- */
-typedef struct {
-    double  *entry;
-    uint32_t first;
-    uint32_t last;
-    uint32_t max_elements;
-    uint32_t num_elements;
-} CIRC_BUFFER;
 
 /*
  * Station info related struct
@@ -55,6 +46,11 @@ typedef struct {
 	double   xdata;
 	double   ddata;
 	double   avg_noise;
+/* */
+	uint8_t  pick_status;
+	uint8_t  coda_status;
+	double   pick_time;
+
 /* */
 	CIRC_BUFFER tpd_buffer;
 } TRACEINFO;

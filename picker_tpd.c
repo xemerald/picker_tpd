@@ -25,8 +25,7 @@
 #include <recordtype.h>
 #include <picker_tpd.h>
 #include <picker_tpd_list.h>
-
-
+#include <picker_tpd_circ_buf.h>
 
 /* Functions prototype in this source file */
 static void picker_tpd_config( char * );
@@ -34,9 +33,8 @@ static void picker_tpd_lookup( void );
 static void picker_tpd_status( unsigned char, short, char * );
 static void picker_tpd_end( void );                /* Free all the local memory & close socket */
 
-static void init_traceinfo( const TRACE2_HEADER *, TRACEINFO * );
+static void init_traceinfo( TRACEINFO *, const TRACE2_HEADER * );
 static int  restart_tracing( TRACEINFO *, int, int );
-static void interpolate( TRACEINFO *, uint8_t *, int );
 
 /* Ring messages things */
 static  SHM_INFO  InRegion;      /* shared memory region to use for i/o    */
@@ -55,8 +53,8 @@ static char     OutRingName[MAX_RING_STR];  /* name of transport ring for i/o   
 static char     MyModName[MAX_MOD_STR];     /* speak as this module name/id      */
 static uint8_t  LogSwitch;                  /* 0 if no logfile should be written */
 static uint64_t HeartBeatInterval;          /* seconds between heartbeats        */
-static uint32_t MaxGapsThreshold;          /* */
-static uint16_t ReadySampleLength;      /* seconds waiting for D.C. */
+static uint32_t MaxGapsThreshold;           /* */
+static uint16_t ReadySeconds;               /* seconds waiting for D.C. */
 static uint16_t nLogo = 0;
 
 /* Things to look up in the earthworm.h tables with getutil.c functions
@@ -93,7 +91,8 @@ int main ( int argc, char **argv )
 	int32_t lockfile_fd;
 
 	uint8_t       *trace_buf;  /* message which is sent to share ring    */
-	TRACE2_HEADER *trh2;  /* message which is sent to share ring    */
+	TRACE2_HEADER *trh2;       /* */
+	int32_t       *idata;      /* */
 	TRACEINFO     *trace_info;
 
 /* Check command line arguments */
@@ -153,7 +152,8 @@ int main ( int argc, char **argv )
 		exit(-1);
 	}
 /* Point to header and data portions of waveform message */
-	trh2 = (TRACE2_HEADER *)trace_buf;
+	trh2  = (TRACE2_HEADER *)trace_buf;
+	idata = (int32_t *)(trh2 + 1);
 
 /* Force a heartbeat to be issued in first pass thru main loop */
 	timeLastBeat = time(&timeNow) - HeartBeatInterval - 1;
@@ -244,14 +244,14 @@ int main ( int argc, char **argv )
 						"picker_tpd: New SCNL(%s.%s.%s.%s) received, starting to trace!\n",
 						trace_info->sta, trace_info->chan, trace_info->net, trace_info->loc
 					);
-					init_traceinfo( trh2, trace_info );
+					init_traceinfo( trace_info, trh2 );
 				}
 
 			/*
 			 * Compute the number of samples since the end of the previous message.
 			 * If (GapSize == 1), no data has been lost between messages.
-			 * If (1 < GapSize <= Gparm.MaxGap), data will be interpolated.
-			 * If (GapSize > Gparm.MaxGap), the picker will go into restart mode.
+			 * If (1 < GapSize <= MaxGapsThreshold), data will be interpolated.
+			 * If (GapSize > MaxGapsThreshold), the picker will go into restart mode.
 			 */
 				double tmp_time = trh2->samprate * (trh2->starttime - traceptr->lasttime);
 				int    gap_size;
@@ -262,7 +262,7 @@ int main ( int argc, char **argv )
 
 			/* Interpolate missing samples and prepend them to the current message */
 				if ((gap_size > 1) && (gap_size <= MaxGapsThreshold) ) {
-					interpolate( trace_info, trace_buf, gap_size );
+					ptpd_interpolate( trace_info, trace_buf, gap_size );
 				}
 			/* Announce large sample gaps */
 				else if ( gap_size > MaxGapsThreshold ) {
@@ -281,14 +281,14 @@ int main ( int argc, char **argv )
 			 */
 				if ( restart_tracing( trace_info, trh2->nsamp, gap_size ) ) {
 					for ( i = 0; i < trh2->nsamp; i++ )
-						ptpd_sample( , trace_info );
+						ptpd_sample( trace_info, idata[i] );
 				}
 				else {
 					/* Placeholder */
 				}
 			/* Save time and amplitude of the end of the current message */
-				traceptr->lastsample = 0;
-				traceptr->lasttime   = tracebuffer.trh2x.endtime;
+				trace_info->lastsample = idata[trh2->nsamp - 1];
+				trace_info->lasttime   = trh2->endtime;
 			}
 		} while ( 1 );  /* end of message-processing-loop */
 	/* no more messages; wait for new ones to arrive */
@@ -543,7 +543,7 @@ static void picker_tpd_end( void )
 /*
  *
  */
-static void init_traceinfo( const TRACE2_HEADER *trh2, TRACEINFO *trace_info )
+static void init_traceinfo( TRACEINFO *trace_info, const TRACE2_HEADER *trh2 )
 {
 	trace_info->readycount = 0;
 	trace_info->lastsample = 0;
@@ -557,7 +557,7 @@ static void init_traceinfo( const TRACE2_HEADER *trh2, TRACEINFO *trace_info )
 	trace_info->ddata      = 0.0;
 	trace_info->avg_noise  = 0.0;
 /* */
-	if ( (int)(trh2->samprate * DEF_MAX_BUFFER_SECONDS) > DEF_MAX_BUFFER_SAMPLES ) {
+	if ( (int)(trh2->samprate * DEF_MAX_BUFFER_SECONDS) > PTPD_CIRC_BUFFER_MAX_ELMS_GET(&trace_info->tpd_buffer) ) {
 		ptpd_circ_buf_free( &trace_info->tpd_buffer );
 		ptpd_circ_buf_init( &trace_info->tpd_buffer, trh2->samprate * DEF_MAX_BUFFER_SECONDS );
 	}
@@ -585,7 +585,7 @@ static int restart_tracing( TRACEINFO *trace_info, int nsamp, int gaps )
 	}
 	else {
 	/* The restart sequence is over */
-		if ( trace_info->readycount >= ReadySampleLength ) {
+		if ( trace_info->readycount >= ReadySeconds / trace_info->delta ) {
 			result = 0;
 		}
 	/* The restart sequence is still in progress */
@@ -596,31 +596,4 @@ static int restart_tracing( TRACEINFO *trace_info, int nsamp, int gaps )
 	}
 
 	return result;
-}
-
-
-/*
- * interpolate() Interpolate samples and insert them at the beginning of
- *               the waveform.
- */
-static void interpolate( TRACEINFO *trace_info, uint8_t *trace_buf, int gaps )
-{
-	int            i;
-	TRACE2_HEADER *trh2  = (TRACE2_HEADER *)trace_buf;
-	int32_t       *idata = (int32_t *)(trh2 + 1);
-	const double   delta = (double)(idata[0] - trace_info->lastsample) / gaps;
-	double         sum_delta;
-
-/* */
-	gaps--;
-	for ( i = trh2->nsamp - 1; i >= 0; i-- )
-		idata[i + gaps] = idata[i];
-
-	for ( i = 0, sum_delta = delta; i < gaps; i++, sum_delta += delta )
-		idata[i] = (int32_t)(trace_info->lastsample + sum_delta + 0.5);
-
-	trh2->nsamp    += gaps;
-	trh2->starttime = trace_info->lasttime + (1.0 / trh2->samprate);
-
-	return;
 }

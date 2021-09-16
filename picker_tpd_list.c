@@ -17,7 +17,7 @@ static TRACEINFO *enrich_traceinfo_raw(
 	TRACEINFO *, const char *, const char *, const char *, const char *,const double
 );
 static int  compare_scnl( const void *, const void * ); /* The compare function of binary tree search */
-static void cal_total_stations( const void *, const VISIT, const int );
+static void calc_total_stations( const void *, const VISIT, const int );
 static void free_traceinfo( void * );
 
 /* Global variables */

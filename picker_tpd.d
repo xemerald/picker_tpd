@@ -17,7 +17,7 @@ HeartBeatInterval  15             # seconds between heartbeats
 
 # Settings for pre-processing of trace:
 #
-DriftCorrectThreshold   30        # seconds waiting for D.C.
+ReadySeconds   30        # seconds waiting for D.C.
 
 # List the message logos to grab from transport ring
 #              Installation       Module          Message Types

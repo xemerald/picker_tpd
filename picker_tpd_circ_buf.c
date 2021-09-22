@@ -74,7 +74,7 @@ void ptpd_circ_buf_free( CIRC_BUFFER *circ_buf )
  *    -1 - The queue is empty or no more old data.
  *    -2 - Entry not yet established.
  */
-int ptpd_circ_buf_prev( CIRC_BUFFER *circ_buf, double *data, uint32_t *pos )
+int ptpd_circ_buf_prev( const CIRC_BUFFER *circ_buf, double *data, uint32_t *pos )
 {
 	int result = 0;
 
@@ -84,7 +84,8 @@ int ptpd_circ_buf_prev( CIRC_BUFFER *circ_buf, double *data, uint32_t *pos )
 
 /* Set shortcut for queue element */
 	dec_circular( circ_buf, pos );
-	*data = circ_buf->entry[*pos];
+	if ( data != (double *)NULL )
+		*data = circ_buf->entry[*pos];
 
 	return result;
 }
@@ -102,7 +103,7 @@ int ptpd_circ_buf_prev( CIRC_BUFFER *circ_buf, double *data, uint32_t *pos )
  *    -1 - The queue is empty or no more new data.
  *    -2 - Entry not yet established.
  */
-int ptpd_circ_buf_next( CIRC_BUFFER *circ_buf, double *data, uint32_t *pos )
+int ptpd_circ_buf_next( const CIRC_BUFFER *circ_buf, double *data, uint32_t *pos )
 {
 	int result = 0;
 
@@ -112,7 +113,8 @@ int ptpd_circ_buf_next( CIRC_BUFFER *circ_buf, double *data, uint32_t *pos )
 
 /* Set shortcut for queue element */
 	inc_circular( circ_buf, pos );
-	*data = circ_buf->entry[*pos];
+	if ( data != (double *)NULL )
+		*data = circ_buf->entry[*pos];
 
 	return result;
 }
@@ -169,7 +171,7 @@ int ptpd_circ_buf_enbuf( CIRC_BUFFER *circ_buf, const double data )
  *  returns:
  *
  */
-static uint32_t inc_circular( CIRC_BUFFER *circ_buf, uint32_t *pos )
+static uint32_t inc_circular( const CIRC_BUFFER *circ_buf, uint32_t *pos )
 {
 	if ( ++(*pos) >= circ_buf->max_elements )
 		*pos = 0;
@@ -186,7 +188,7 @@ static uint32_t inc_circular( CIRC_BUFFER *circ_buf, uint32_t *pos )
  *  returns:
  *
  */
-static uint32_t dec_circular( CIRC_BUFFER *circ_buf, uint32_t *pos )
+static uint32_t dec_circular( const CIRC_BUFFER *circ_buf, uint32_t *pos )
 {
 	int64_t _pos = *pos;
 
@@ -207,7 +209,7 @@ static uint32_t dec_circular( CIRC_BUFFER *circ_buf, uint32_t *pos )
  *    drc     -
  *  returns:
  */
-static uint32_t move_circular( CIRC_BUFFER *circ_buf, uint32_t *pos, int step )
+static uint32_t move_circular( const CIRC_BUFFER *circ_buf, uint32_t *pos, int step )
 {
 	if ( abs(step) > circ_buf->max_elements )
 		return *pos;

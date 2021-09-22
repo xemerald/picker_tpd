@@ -49,8 +49,11 @@ typedef struct {
 /* */
 	uint8_t  pick_status;
 	uint8_t  coda_status;
+	char     first_motion;
+	int      pick_weight;
 	double   pick_time;
 
 /* */
+	CIRC_BUFFER raw_buffer;
 	CIRC_BUFFER tpd_buffer;
 } TRACEINFO;

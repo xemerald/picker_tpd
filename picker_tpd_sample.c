@@ -24,6 +24,7 @@ void ptpd_sample( TRACEINFO *trace_info, int sample )
 	ndata           = sample * trace_info->cfactor;
 	trace_info->avg = calc_mavg( ndata, trace_info->avg );
 	ndata          -= trace_info->avg;
+	ptpd_circ_buf_enbuf( &trace_info->raw_buffer, ndata );
 /* */
 	ndata = calc_tpd(
 		trace_info->delta, trace_info->alpha, trace_info->beta, ndata,

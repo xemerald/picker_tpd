@@ -12,6 +12,7 @@ static double calc_delta_tpd_max( const CIRC_BUFFER * );
 static double refine_arrival_time( const CIRC_BUFFER *, const double, const double );
 static int    refine_stage_1_2( const CIRC_BUFFER *, const double, const int, uint32_t * );
 static int    refine_stage_3( const CIRC_BUFFER *, const double, const int, uint32_t * );
+static char   define_first_motion( const CIRC_BUFFER *, uint32_t );
 
 /*
  *
@@ -24,22 +25,7 @@ void ptpd_pick( TRACEINFO *trace_info, void *trace_buf )
 
 
 	if ( (trace_info->pick_status > 0) || (trace_info->coda_status > 0) )  {
-		//event_active = scan_event( trace_info, trace_buf, &sample_index );
 
-		if ( event_active == 1 )           /* Event active at end of message */
-			return;
-
-		if ( event_active == -1 )
-			logit( "e", "Coda too short. Event aborted.\n" );
-
-		if ( event_active == -2 )
-			logit( "e", "No recent zero crossings. Event aborted.\n" );
-
-		if ( event_active == -3 )
-			logit( "e", "Noise pick. Event aborted.\n" );
-
-		if ( event_active == 0 )
-			logit( "e", "Event over. Picks/codas reported.\n" );
 	/* Next, go into search mode */
 	}
 
@@ -49,29 +35,12 @@ void ptpd_pick( TRACEINFO *trace_info, void *trace_buf )
 		event_found = scan_for_event( trace_info, trace_buf, &sample_index );
 
 		if ( event_found ) {
-			if ( Gparm->Debug ) logit( "e", "Event found.\n" );
+
 		}
 		else {
-			if ( Gparm->Debug ) logit( "e", "Event not found.\n" );
 			return;
 		}
 	/* EventActive() tries to see if the event is valid and still active */
-		//event_active = EventActive( Sta, WaveBuf, Gparm, Ewh, &sample_index );
-
-		if ( event_active == 1 )           /* Event active at end of message */
-			return;
-
-		if ( (event_active == -1) && Gparm->Debug )
-			logit( "e", "Coda too short. Event aborted.\n" );
-
-		if ( (event_active == -2) && Gparm->Debug )
-			logit( "e", "No recent zero crossings. Event aborted.\n" );
-
-		if ( (event_active == -3) && Gparm->Debug )
-			logit( "e", "Noise pick. Event aborted.\n" );
-
-		if ( (event_active == 0) && Gparm->Debug )
-			logit( "e", "Event over. Picks/codas reported.\n" );
 	} /* end of search mode while loop */
 }
 
@@ -82,6 +51,8 @@ static int scan_for_event( TRACEINFO *trace_info, void *trace_buf, int *sample_i
 {
 	TRACE2_HEADER *trh2  = (TRACE2_HEADER *)trace_buf;
 	int32_t       *idata = (int32_t *)(trh2 + 1);
+	int            sample_refine = 0;
+	double         delta_tpd;
 
 /* Set pick and coda calculations to inactive mode */
 	trace_info->pick_status = trace_info->coda_status = 0;
@@ -91,17 +62,104 @@ static int scan_for_event( TRACEINFO *trace_info, void *trace_buf, int *sample_i
 	/* Update Tpd using the current sample */
 		ptpd_sample( trace_info, idata[*sample_index] );
 	/*  */
-		if ( calc_delta_tpd_max( &trace_info->tpd_buffer, trace_info->delta ) > TRIGGER_THRESHOLD_C1 ) {
+		if ( (delta_tpd = calc_delta_tpd_max( &trace_info->tpd_buffer, trace_info->delta )) > TRIGGER_THRESHOLD_C1 ) {
+		/* Rollback the arrival time */
+			sample_refine = refine_arrival_time( &trace_info->tpd_buffer, trace_info->delta, delta_tpd );
 		/* Initialize pick variables */
-			trace_info->pick_time = trh2->starttime + (double)*sample_index * trace_info->delta;
+			trace_info->pick_time = trh2->starttime + (double)(*sample_index - sample_refine) * trace_info->delta;
 		/* Picks/codas are now active */
-			trace_info->pick_status = trace_info->coda_status = 0;
+			trace_info->pick_status = trace_info->coda_status = 1;
 			return 1;
 		}
 	}
 
 /* Message ended; event not found */
 	return 0;
+}
+
+/* Returns negative values if problems:
+-1 if coda too short and event aborted
+-2 if no recent zero crossings; aborted
+-3 noise spike; aborted
+aborted means status set to 0 for both Coda and Pick
+*/
+static int active_for_event( TRACEINFO *trace_info, void *trace_buf, int *sample_index )
+{
+	TRACE2_HEADER *trh2  = (TRACE2_HEADER *)trace_buf;
+	int32_t       *idata = (int32_t *)(trh2 + 1);
+	int            sample_refine = 0;
+	double         delta_tpd;
+
+/* An event (pick and/or coda) is active. See if it should be declared over. */
+	while ( ++(*sample_index) < trh2->nsamp ) {
+	/* Update Tpd using the current sample */
+		ptpd_sample( trace_info, idata[*sample_index] );
+
+		/********************************************************
+		*                 BEGIN CODA CALCULATION               *
+		********************************************************/
+
+		/* A coda is active.  Measure coda length and amplitudes.
+		Warning. The coda length calculation is correct only
+		if the sampling rate is a whole number.
+		*****************************************************/
+		if ( trace_info->coda_status == 1 ) {
+
+		}
+
+	/* A pick is active */
+		if ( trace_info->pick_status == 1 ) {
+			int    i;              /* Peak index */
+			int    k;              /* Index into sarray */
+			int    itrm;           /* Number of small counts allowed before */
+		/*   pick is declared over */
+			double xon;            /* Used in pick weight calculation */
+			double xpc;            /* ditto */
+			double xp0,xp1,xp2;    /* ditto */
+
+		/* A valid pick was found. Determine the first motion. */
+			trace_info->first_motion = define_first_motion( &trace_info->raw_buffer, pos );
+
+		/* Pick weight calculation */
+			xpc = ( Pick->xpk[0] > fabs( (double)Sta->sarray[0] ) ) ?
+			Pick->xpk[0] : Pick->xpk[1];
+			xon = fabs( (double)Sta->xdot / Sta->xfrz );
+			xp0 = Pick->xpk[0] / Sta->xfrz;
+			xp1 = Pick->xpk[1] / Sta->xfrz;
+			xp2 = Pick->xpk[2] / Sta->xfrz;
+
+			Pick->weight = 3;
+
+			if ( (xp0 > 2.) && (xon > .5) && (xpc > 25.) )
+			Pick->weight = 2;
+
+			if ( (xp0 > 3.) && ((xp1 > 3.) || (xp2 > 3.)) && (xon > .5)
+			&& (xpc > 100.) )
+			Pick->weight = 1;
+
+			if ( (xp0 > 4.) && ((xp1 > 6.) || (xp2 > 6.)) && (xon > .5)
+			&& (xpc > 200.) )
+			Pick->weight = 0;
+
+			Pick->status = 2;               /* Pick calculated but not reported */
+
+			/* Report pick and coda
+			********************/
+			if ( Coda->status == 2 ) {
+			}
+		}
+
+		/******************************************************
+		*                 END PICK CALCULATION               *
+		******************************************************/
+
+		/* If the pick is over and coda measurement
+		is done, scan for a new event.
+		****************************************/
+		if ( (Pick->status == 0) && (Coda->status == 0) )
+		return 0;
+}
+return 1;       /* Event is still active */
 }
 
 
@@ -221,6 +279,48 @@ static int refine_stage_3( const CIRC_BUFFER *tpd_buf, const double delta, const
 	/* */
 		if ( ptpd_circ_buf_prev( tpd_buf, NULL, pos ) )
 			break;
+	}
+
+	return result;
+}
+
+/*
+ *
+ */
+static char define_first_motion( const CIRC_BUFFER *raw_buf, uint32_t first_pos )
+{
+	int      i;
+	int      direction = 0;
+	char     result = ' ';
+	uint32_t next_pos = first_pos;
+
+/* */
+	if ( !ptpd_circ_buf_next( raw_buf, NULL, &next_pos ) ) {
+		direction = (int)(PTPD_CIRC_BUFFER_DATA_GET( raw_buf, next_pos ) - PTPD_CIRC_BUFFER_DATA_GET( raw_buf, first_pos ));
+		for ( i = 0; i < 10; i++ ) {
+			ptpd_circ_buf_next( raw_buf, NULL, &first_pos );
+			ptpd_circ_buf_next( raw_buf, NULL, &next_pos );
+		/* */
+			if ( direction <= 0 ) {
+				if ( (PTPD_CIRC_BUFFER_DATA_GET( raw_buf, next_pos ) > PTPD_CIRC_BUFFER_DATA_GET( raw_buf, first_pos )) ) {
+					if ( i == 0 )
+						break;
+					result = '-';  /* First motion is negative */
+					break;
+				}
+			}
+			else {
+				if ( (PTPD_CIRC_BUFFER_DATA_GET( raw_buf, next_pos ) < PTPD_CIRC_BUFFER_DATA_GET( raw_buf, first_pos )) ) {
+					if ( i == 0 )
+						break;
+					result = '+';  /* First motion is positive */
+					break;
+				}
+			}
+		}
+	/* */
+		if ( i >= 10 )
+			result = direction <= 0 ? '-' : '+';
 	}
 
 	return result;

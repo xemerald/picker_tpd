@@ -18,9 +18,11 @@
 #define  DEF_TMX                0.019f
 #define  DEF_TMX_SQ             0.000361f
 
-#define  TRIGGER_THRESHOLD_C1   0.015f
-#define  TRIGGER_THRESHOLD_C2   0.01f
-#define  DEF_C1_HALF_THRESHOLD  0.006f
+#define  TRIGGER_THRESHOLD_C1     0.015f
+#define  TRIGGER_THRESHOLD_C2     0.01f
+#define  TRIGGER_THRESHOLD_C6     0.024f
+#define  DETRIGGER_THRESHOLD_C3   0.01f
+#define  DEF_C1_HALF_THRESHOLD    0.006f
 
 /*
  * Station info related struct
@@ -48,11 +50,9 @@ typedef struct {
 	double   avg_noise;
 /* */
 	uint8_t  pick_status;
-	uint8_t  coda_status;
 	char     first_motion;
 	int      pick_weight;
 	double   pick_time;
-
 /* */
 	CIRC_BUFFER raw_buffer;
 	CIRC_BUFFER tpd_buffer;

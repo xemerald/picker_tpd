@@ -1,0 +1,39 @@
+#
+#    Revision history:
+#
+#     Revision 1.0  2018/03/19 17:38:40  Benjamin Yang
+#     Initial version.
+#
+LOCAL_UTILS = \
+	scnlfilter.o \
+	circ_buf.o
+
+CFLAGS = $(GLOBALFLAGS) -I../../include
+
+LIB_DIR = ../../lib
+
+# All library command
+all: $(LOCAL_UTILS)
+	@echo Moving all the utilities...
+	@mv *.o $(LIB_DIR)
+
+#
+# Compile rule for Object
+#
+.c.o:
+	@echo Compiling $<...
+	@$(CC) $(CFLAGS) -c $<
+
+#
+# Clean-up rules
+#
+clean:
+	@echo Cleaning build objects...
+	@rm -f a.out core *.o *.obj *% *~
+
+clean_lib:
+	@echo Removing libraries...
+	@cd $(LIB_DIR) && \
+		rm -f *.o *.a *.so
+
+PHONY:

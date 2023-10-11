@@ -304,7 +304,7 @@ static char define_first_motion( const CIRC_BUFFER *raw_buf, uint32_t pick_pos )
 		/* */
 			if ( direction < 0 ) {
 				if ( next_data > now_data || i == 7 ) {
-					if ( i == 0 )
+					if ( i < 2 )
 						break;
 					result = 'D';  /* First motion is negative */
 					break;
@@ -312,7 +312,7 @@ static char define_first_motion( const CIRC_BUFFER *raw_buf, uint32_t pick_pos )
 			}
 			else {
 				if ( next_data < now_data || i == 7 ) {
-					if ( i == 0 )
+					if ( i < 2 )
 						break;
 					result = 'U';  /* First motion is positive */
 					break;

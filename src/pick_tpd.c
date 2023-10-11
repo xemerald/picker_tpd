@@ -64,7 +64,7 @@ static uint8_t MyModId;         /* Module Id for this program        */
 static uint8_t TypeHeartBeat;
 static uint8_t TypeError;
 static uint8_t TypeTracebuf2;
-static uint8_t TypeFullPick;
+static uint8_t TypeEarlyPick;
 
 /* Error messages used by picker_tpd
  *********************************/
@@ -131,7 +131,7 @@ int main ( int argc, char **argv )
 /* Build the message */
 	Putlogo.instid = InstId;
 	Putlogo.mod    = MyModId;
-	Putlogo.type   = TypeFullPick;
+	Putlogo.type   = TypeEarlyPick;
 
 /* Attach to Input/Output shared memory ring */
 	tport_attach( &InRegion, InRingKey );
@@ -532,8 +532,8 @@ static void pick_tpd_lookup( void )
 		fprintf(stderr, "pick_tpd: Invalid message type <TYPE_TRACEBUF2>; exiting!\n");
 		exit(-1);
 	}
-	if ( GetType("TYPE_FULL_PICK", &TypeFullPick) != 0 ) {
-		fprintf(stderr, "pick_tpd: Invalid message type <TYPE_FULL_PICK>; exiting!\n");
+	if ( GetType("TYPE_EARLY_PICK", &TypeEarlyPick) != 0 ) {
+		fprintf(stderr, "pick_tpd: Invalid message type <TYPE_EARLY_PICK>; exiting!\n");
 		exit(-1);
 	}
 

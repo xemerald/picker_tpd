@@ -7,7 +7,7 @@
 #include <transport.h>
 /* */
 #include <pick_tpd.h>
-#include <full_event_msg.h>
+#include <early_event_msg.h>
 
 /**
  * @brief
@@ -20,8 +20,8 @@
  */
 void ptpd_pick_report( TRACEINFO *trace_info, int pick_id, const char *phase, SHM_INFO *out_region, MSG_LOGO *put_logo )
 {
-	FULL_EVENT_PICK_MSG outmsg;
-	PICK_INFO          *pick = &trace_info->pick;
+	EARLY_PICK_MSG outmsg;
+	PICK_INFO     *pick = &trace_info->pick;
 
 /* */
 	outmsg.pick_id = pick_id;
@@ -46,7 +46,7 @@ void ptpd_pick_report( TRACEINFO *trace_info, int pick_id, const char *phase, SH
 	);
 #endif
 /* Send the pick to the output ring */
-	if ( tport_putmsg( out_region, put_logo, sizeof(FULL_EVENT_PICK_MSG), (char *)&outmsg ) != PUT_OK )
+	if ( tport_putmsg( out_region, put_logo, sizeof(EARLY_PICK_MSG), (char *)&outmsg ) != PUT_OK )
 		logit( "et", "pick_tpd: Error sending pick to output ring.\n" );
 
 	return;

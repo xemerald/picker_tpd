@@ -229,7 +229,7 @@ static int refine_stage_1_2(
 			break;
 		}
 	/* Start to use the 2nd refine condition */
-		if ( i > (int)(samprate * 0.15) && !result ) {
+		if ( !result && i > (int)(samprate * 0.15) ) {
 			delta_thr = delta_tpd * 0.8;
 			result = i;
 		}
@@ -362,13 +362,13 @@ static int define_pick_weight( const CIRC_BUFFER *raw_buf, const int samprate, u
 
 /*
  * Calculating the ratio
- * If Ratio  >  30 P arrival's weighting define 0
- * 30 > R >  15 P arrival's weighting define 1
- * 15 > R >   3 P arrival's weighting define 2
- * 3 > R > 1.5 P arrival's weighting define 3
- * 1.5 > R       P arrival's weighting define 4
+ * If Ratio > 30   P arrival's weighting define 0
+ * 30 > Ratio > 15 P arrival's weighting define 1
+ * 15 > Ratio > 3  P arrival's weighting define 2
+ * 3 > Ratio > 1.5 P arrival's weighting define 3
+ * 1.5 > Ratio     P arrival's weighting define 4
  */
-	if ( sum1 > 0.0001 )
+	if ( sum1 > 0.001 )
 		ratio = sum0 / sum1;
 	else
 		ratio = 0.1;

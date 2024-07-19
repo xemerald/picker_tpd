@@ -34,7 +34,7 @@ void ptpd_pick_report( TRACEINFO *trace_info, int pick_id, const char *phase, SH
 /* */
 	outmsg.flag       ^= outmsg.flag;
 	outmsg.polarity    = pick->first_motion;
-	outmsg.ps_diff     = 0.0;
+	outmsg.sp_diff     = 0.0;
 	outmsg.pick_time   = pick->time;
 	outmsg.pick_weight = pick->weight;
 	outmsg.residual    = 0.0;

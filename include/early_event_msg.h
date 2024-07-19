@@ -143,7 +143,7 @@ typedef struct {
 	float    latitude;
 	float    longitude;
 	float    elevation;
-	float    ps_diff;
+	float    sp_diff;
 	float    loc_weight;
 	float    dist;
 	float    azi;

@@ -289,14 +289,8 @@ static int refine_stage_3( const CIRC_BUFFER *tpd_buf, const double delta, const
  */
 static char define_first_motion( const CIRC_BUFFER *raw_buf, uint32_t pick_pos )
 {
-#define X(a, b) b,
-	static char polarity[] = {
-		EARLY_PICK_POLARITY_TABLE
-	};
-#undef X
-
 	int    direction = 0;
-	char   result    = polarity[EARLY_PICK_POLARITY_UNKNOW];
+	char   result    = EARLY_PICK_POLARITY_UNKNOW;
 	double now_data  = CIRC_BUFFER_DATA_GET( raw_buf, pick_pos );
 	double next_data;
 
@@ -313,7 +307,7 @@ static char define_first_motion( const CIRC_BUFFER *raw_buf, uint32_t pick_pos )
 				if ( next_data > now_data || i == 7 ) {
 					if ( i < 2 )
 						break;
-					result = polarity[EARLY_PICK_POLARITY_DOWN];  /* First motion is negative */
+					result = EARLY_PICK_POLARITY_DOWN;  /* First motion is negative */
 					break;
 				}
 			}
@@ -321,7 +315,7 @@ static char define_first_motion( const CIRC_BUFFER *raw_buf, uint32_t pick_pos )
 				if ( next_data < now_data || i == 7 ) {
 					if ( i < 2 )
 						break;
-					result = polarity[EARLY_PICK_POLARITY_UP];  /* First motion is positive */
+					result = EARLY_PICK_POLARITY_UP;  /* First motion is positive */
 					break;
 				}
 			}

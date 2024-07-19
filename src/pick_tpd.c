@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
 #include <float.h>
 #include <math.h>
@@ -233,7 +234,7 @@ int main ( int argc, char **argv )
 						"pick_tpd: New SCNL %s.%s.%s.%s received, starting to trace!\n",
 						traceptr->sta, traceptr->chan, traceptr->net, traceptr->loc
 					);
-					traceptr->firsttime = FALSE;
+					traceptr->firsttime = false;
 					ptpd_param_init( traceptr, &inbuffer.trh2 );
 				}
 			/* Remap the SCNL of this incoming trace */
@@ -407,11 +408,12 @@ static void pick_tpd_config( char *configfile )
 				HeartBeatInterval = k_long();
 				init[4] = 1;
 			}
-		/* 6 */
+		/* 5 */
 			else if ( k_its("ReadySeconds") ) {
 				ReadySeconds = k_long();
 				init[5] = 1;
 			}
+		/* 6 */
 			else if ( k_its("MaxGap") ) {
 				MaxGapsThreshold = k_long();
 				init[6] = 1;
@@ -484,8 +486,8 @@ static void pick_tpd_config( char *configfile )
 		if ( !init[2] ) logit("e", "<InputRing> "            );
 		if ( !init[3] ) logit("e", "<OutputRing> "           );
 		if ( !init[4] ) logit("e", "<HeartBeatInterval> "    );
-		if ( !init[5] ) logit("e", "<OutputType> "           );
-		if ( !init[6] ) logit("e", "<ReadySeconds> ");
+		if ( !init[5] ) logit("e", "<ReadySeconds> "         );
+		if ( !init[6] ) logit("e", "<MaxGap> "               );
 		if ( !init[7] ) logit("e", "any <GetEventsFrom> "    );
 
 		logit("e", "command(s) in <%s>; exiting!\n", configfile);

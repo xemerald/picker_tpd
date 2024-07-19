@@ -24,25 +24,26 @@ void ptpd_pick_report( TRACEINFO *trace_info, int pick_id, const char *phase, SH
 	PICK_INFO     *pick = &trace_info->pick;
 
 /* */
-	outmsg.pick_id = pick_id;
-	outmsg.seq = 0;
+	outmsg.pid = pick_id;
 /* */
-	strcpy(outmsg.station, trace_info->sta);
-	strcpy(outmsg.channel, trace_info->chan);
-	strcpy(outmsg.network, trace_info->net);
-	strcpy(outmsg.location, trace_info->loc);
+	strncpy(outmsg.station , trace_info->sta , EARLY_PICK_STATION_LEN - 1 );
+	strncpy(outmsg.channel , trace_info->chan, EARLY_PICK_CHANNEL_LEN - 1 );
+	strncpy(outmsg.network , trace_info->net , EARLY_PICK_NETWORK_LEN - 1 );
+	strncpy(outmsg.location, trace_info->loc , EARLY_PICK_LOCATION_LEN - 1);
+	strncpy(outmsg.phase   , phase           , EARLY_PICK_PHASE_LEN - 1   );
 /* */
-	strcpy(outmsg.phase_name, phase);
-	outmsg.polarity = pick->first_motion == ' ' ? '?' : pick->first_motion;
-	outmsg.picktime = pick->time;
-	outmsg.residual = 0.0;
-	outmsg.weight = pick->weight;
+	outmsg.flag       ^= outmsg.flag;
+	outmsg.polarity    = pick->first_motion;
+	outmsg.ps_diff     = 0.0;
+	outmsg.pick_time   = pick->time;
+	outmsg.pick_weight = pick->weight;
+	outmsg.residual    = 0.0;
 /* */
 #ifdef _DEBUG
 	printf(
-		"pick_tpd: Pick %d %s.%s.%s.%s %s %.2lf %c %d\n",
-		outmsg.pick_id, outmsg.station, outmsg.channel, outmsg.network, outmsg.location,
-		outmsg.phase_name, outmsg.picktime, outmsg.polarity, outmsg.weight
+		"pick_tpd: New phase pick -> %d %s.%s.%s.%s %s %.2lf %c %d\n",
+		outmsg.pid, outmsg.station, outmsg.channel, outmsg.network, outmsg.location,
+		outmsg.phase, outmsg.pick_time, outmsg.polarity, outmsg.pick_weight
 	);
 #endif
 /* Send the pick to the output ring */

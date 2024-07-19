@@ -7,6 +7,7 @@
 /* */
 #include <trace_buf.h>
 /* */
+#include <early_event_msg.h>
 #include <pick_tpd.h>
 #include <circ_buf.h>
 #include <pick_tpd_sample.h>
@@ -288,9 +289,15 @@ static int refine_stage_3( const CIRC_BUFFER *tpd_buf, const double delta, const
  */
 static char define_first_motion( const CIRC_BUFFER *raw_buf, uint32_t pick_pos )
 {
+#define X(a, b) b,
+	static char polarity[] = {
+		EARLY_PICK_POLARITY_TABLE
+	};
+#undef X
+
 	int    direction = 0;
-	char   result = ' ';
-	double now_data = CIRC_BUFFER_DATA_GET( raw_buf, pick_pos );
+	char   result    = polarity[EARLY_PICK_POLARITY_UNKNOW];
+	double now_data  = CIRC_BUFFER_DATA_GET( raw_buf, pick_pos );
 	double next_data;
 
 /* */
@@ -306,7 +313,7 @@ static char define_first_motion( const CIRC_BUFFER *raw_buf, uint32_t pick_pos )
 				if ( next_data > now_data || i == 7 ) {
 					if ( i < 2 )
 						break;
-					result = 'D';  /* First motion is negative */
+					result = polarity[EARLY_PICK_POLARITY_DOWN];  /* First motion is negative */
 					break;
 				}
 			}
@@ -314,7 +321,7 @@ static char define_first_motion( const CIRC_BUFFER *raw_buf, uint32_t pick_pos )
 				if ( next_data < now_data || i == 7 ) {
 					if ( i < 2 )
 						break;
-					result = 'U';  /* First motion is positive */
+					result = polarity[EARLY_PICK_POLARITY_UP];  /* First motion is positive */
 					break;
 				}
 			}

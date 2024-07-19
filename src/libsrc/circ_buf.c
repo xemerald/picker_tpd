@@ -1,21 +1,31 @@
 /**
  * @file circ_buf.c
- * @author your name (you@domain.com)
+ * @author Benjamin Ming Yang @ Department of Geoscience, National Taiwan University (b98204032@gmail.com)
  * @brief
- * @version 0.1
  * @date 2023-10-01
  *
  * @copyright Copyright (c) 2023
  *
  */
-/* Standard C header include */
+
+/**
+ * @name Standard C header include
+ *
+ */
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
 
+/**
+ * @name
+ *
+ */
 #include <circ_buf.h>
 
-/* */
+/**
+ * @name Internal functions' prototype
+ *
+ */
 static uint32_t inc_circular( const CIRC_BUFFER *, uint32_t * );
 static uint32_t dec_circular( const CIRC_BUFFER *, uint32_t * );
 static uint32_t move_circular( const CIRC_BUFFER *, uint32_t *, int );
@@ -26,8 +36,8 @@ static uint32_t move_circular( const CIRC_BUFFER *, uint32_t *, int );
  * @param circ_buf
  * @param max_elements
  * @return int
- *    -1 - if we couldn't get the memory
- *    -2 - if the amount implied is bigger than a long
+ * @retval -1 - if we couldn't get the memory
+ * @retval -2 - if the amount implied is bigger than a long
  */
 int circ_buf_init( CIRC_BUFFER *circ_buf, uint32_t max_elements )
 {
@@ -70,6 +80,8 @@ void circ_buf_free( CIRC_BUFFER *circ_buf )
 			free(circ_buf->entry);
 			circ_buf->entry = NULL;
 		}
+	/* Just in case */
+		circ_buf->max_elements = circ_buf->num_elements = 0;
 	}
 
 	return;
@@ -83,9 +95,9 @@ void circ_buf_free( CIRC_BUFFER *circ_buf )
  * @param data
  * @param pos
  * @return int
- *     0 - No error.
- *    -1 - The queue is empty or no more old data.
- *    -2 - Entry not yet established.
+ * @retval 0 - No error.
+ * @retval -1 - The queue is empty or no more old data.
+ * @retval -2 - Entry not yet established.
  */
 int circ_buf_prev( const CIRC_BUFFER *circ_buf, double *data, uint32_t *pos )
 {
@@ -110,9 +122,9 @@ int circ_buf_prev( const CIRC_BUFFER *circ_buf, double *data, uint32_t *pos )
  * @param data
  * @param pos
  * @return int
- *     0 - No error.
- *    -1 - The queue is empty or no more new data.
- *    -2 - Entry not yet established.
+ * @retval 0 - No error.
+ * @retval -1 - The queue is empty or no more new data.
+ * @retval -2 - Entry not yet established.
  */
 int circ_buf_next( const CIRC_BUFFER *circ_buf, double *data, uint32_t *pos )
 {
@@ -135,10 +147,10 @@ int circ_buf_next( const CIRC_BUFFER *circ_buf, double *data, uint32_t *pos )
  * @param circ_buf
  * @param data
  * @return int
- *     0 - No error.
- *    -1 - Not defined yet.
- *    -2 - Entry not yet established.
- *    -3 - There is overlapping between last time and this time.
+ * @retval 0 - No error.
+ * @retval -1 - Not defined yet.
+ * @retval -2 - Entry not yet established.
+ * @retval -3 - There is overlapping between last time and this time.
  */
 int circ_buf_enbuf( CIRC_BUFFER *circ_buf, const double data )
 {
@@ -170,6 +182,19 @@ int circ_buf_enbuf( CIRC_BUFFER *circ_buf, const double data )
 	circ_buf->num_elements++;
 
 	return result;
+}
+
+/**
+ * @brief
+ *
+ * @param circ_buf
+ * @param pos
+ * @param step
+ * @return uint32_t
+ */
+uint32_t circ_buf_move( const CIRC_BUFFER *circ_buf, uint32_t *pos, int step )
+{
+	return move_circular( circ_buf, pos, step );
 }
 
 /**
@@ -216,7 +241,11 @@ static uint32_t dec_circular( const CIRC_BUFFER *circ_buf, uint32_t *pos )
  */
 static uint32_t move_circular( const CIRC_BUFFER *circ_buf, uint32_t *pos, int step )
 {
-	if ( abs(step) > circ_buf->max_elements )
+/*
+ * If the step is larger than the max elements, the intention is ambigular,
+ * therefore, return the same position.
+ */
+	if ( abs(step) > circ_buf->max_elements || !step )
 		return *pos;
 
 /* Forward step */

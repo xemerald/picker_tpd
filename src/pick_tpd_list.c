@@ -4,10 +4,11 @@
 #define _GNU_SOURCE
 /* */
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <search.h>
 /* */
-#include <earthworm.h>
+#include <trace_buf.h>
 /* */
 #include <pick_tpd.h>
 #include <pick_tpd_list.h>
@@ -32,9 +33,9 @@ TRACEINFO *ptpd_list_search( const TRACE2_HEADER *trh2 )
 /* Test if already in the tree */
 	if ( (traceptr = ptpd_list_find( trh2 )) == NULL ) {
 		traceptr = (TRACEINFO *)calloc(1, sizeof(TRACEINFO));
-		memcpy(traceptr->sta,  trh2->sta, TRACE2_STA_LEN);
-		memcpy(traceptr->net,  trh2->net, TRACE2_NET_LEN);
-		memcpy(traceptr->loc,  trh2->loc, TRACE2_LOC_LEN);
+		memcpy(traceptr->sta , trh2->sta , TRACE2_STA_LEN );
+		memcpy(traceptr->net , trh2->net , TRACE2_NET_LEN );
+		memcpy(traceptr->loc , trh2->loc , TRACE2_LOC_LEN );
 		memcpy(traceptr->chan, trh2->chan, TRACE2_CHAN_LEN);
 
 		if ( (traceptr = tsearch(traceptr, &Root, compare_scnl)) == NULL ) {
@@ -43,7 +44,7 @@ TRACEINFO *ptpd_list_search( const TRACE2_HEADER *trh2 )
 		}
 
 		traceptr = *(TRACEINFO **)traceptr;
-		traceptr->firsttime = TRUE;
+		traceptr->firsttime = true;
 		traceptr->match     = NULL;
 	}
 
@@ -63,9 +64,9 @@ TRACEINFO *ptpd_list_find( const TRACE2_HEADER *trh2 )
 	TRACEINFO  key;
 	TRACEINFO *traceptr = NULL;
 
-	memcpy(key.sta,  trh2->sta, TRACE2_STA_LEN);
-	memcpy(key.net,  trh2->net, TRACE2_NET_LEN);
-	memcpy(key.loc,  trh2->loc, TRACE2_LOC_LEN);
+	memcpy(key.sta , trh2->sta , TRACE2_STA_LEN );
+	memcpy(key.net , trh2->net , TRACE2_NET_LEN );
+	memcpy(key.loc , trh2->loc , TRACE2_LOC_LEN );
 	memcpy(key.chan, trh2->chan, TRACE2_CHAN_LEN);
 
 /* Find which trace */
@@ -118,7 +119,8 @@ static void free_node( void *node )
 {
 	TRACEINFO *traceptr = (TRACEINFO *)node;
 
-
+	circ_buf_free( &traceptr->raw_buffer );
+	circ_buf_free( &traceptr->tpd_buffer );
 	free(traceptr);
 
 	return;

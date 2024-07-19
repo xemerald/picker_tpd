@@ -1,18 +1,22 @@
 /**
  * @file circ_buf.h
- * @author your name (you@domain.com)
+ * @author Benjamin Yang @ Department of Geoscience, National Taiwan University
  * @brief
- * @version 0.1
  * @date 2023-10-02
  *
  * @copyright Copyright (c) 2023
  *
  */
 #pragma once
-/* Standard header include */
+
+/**
+ * @name Standard header include
+ *
+ */
 #include <stdint.h>
 
-/*
+/**
+ * @brief
  *
  */
 typedef struct {
@@ -29,16 +33,24 @@ typedef struct {
 	uint32_t num_elements;
 } CIRC_BUFFER;
 
-/* */
+/**
+ * @name
+ *
+ */
+#define CIRC_BUFFER_ZERO_SET(BUFFER)       (*(BUFFER) = (CIRC_BUFFER){ NULL, 0, 0, 0, 0, 0 })
 #define CIRC_BUFFER_FIRST_GET(BUFFER)      ((BUFFER)->first)
 #define CIRC_BUFFER_LAST_GET(BUFFER)       ((BUFFER)->last)
 #define CIRC_BUFFER_MAX_ELMS_GET(BUFFER)   ((BUFFER)->max_elements)
 #define CIRC_BUFFER_NUM_ELMS_GET(BUFFER)   ((BUFFER)->num_elements)
 #define CIRC_BUFFER_DATA_GET(BUFFER, POS)  ((BUFFER)->entry[(POS)])
 
-/* */
-int  circ_buf_init( CIRC_BUFFER *, uint32_t );
-void circ_buf_free( CIRC_BUFFER * );
-int  circ_buf_prev( const CIRC_BUFFER *, double *, uint32_t * );
-int  circ_buf_next( const CIRC_BUFFER *, double *, uint32_t * );
-int  circ_buf_enbuf( CIRC_BUFFER *, const double );
+/**
+ * @name
+ *
+ */
+int      circ_buf_init( CIRC_BUFFER *, uint32_t );
+void     circ_buf_free( CIRC_BUFFER * );
+int      circ_buf_prev( const CIRC_BUFFER *, double *, uint32_t * );
+int      circ_buf_next( const CIRC_BUFFER *, double *, uint32_t * );
+int      circ_buf_enbuf( CIRC_BUFFER *, const double );
+uint32_t circ_buf_move( const CIRC_BUFFER *, uint32_t *, int );

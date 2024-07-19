@@ -122,7 +122,7 @@ int ptpd_local_load( void *dest, const int dest_size, const void *src )
 		}
 	}
 /* Source datatype is single precision floating number */
-	if ( src_trh2->datatype[1] == '4' && (src_trh2->datatype[0] == 'f' || src_trh2->datatype[0] == 't') ) {
+	else if ( src_trh2->datatype[1] == '4' && (src_trh2->datatype[0] == 'f' || src_trh2->datatype[0] == 't') ) {
 		const float *srcdata_f    = (float *)(src_trh2 + 1);
 		const float *srcdata_fend = srcdata_f + src_trh2->nsamp;
 	/* */

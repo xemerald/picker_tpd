@@ -216,7 +216,7 @@ int main ( int argc, char **argv )
 				if (
 					SCNLFilterSwitch &&
 					!(traceptr = ptpd_list_find( &inbuffer.trh2 )) &&
-					!scnlfilter_trace_apply( inbuffer.msg, reclogo.type, &_match )
+					!scnlfilter_apply( inbuffer.trh2.sta, inbuffer.trh2.chan, inbuffer.trh2.net, inbuffer.trh2.loc, &_match )
 				) {
 				/* Found a new trace but the SCNL is not in the filter, drop it! */
 					continue;
@@ -243,10 +243,10 @@ int main ( int argc, char **argv )
 			/* Remap the SCNL of this incoming trace */
 				if ( SCNLFilterSwitch ) {
 					if ( traceptr->match ) {
-						scnlfilter_trace_remap( inbuffer.msg, reclogo.type, traceptr->match );
+						scnlfilter_remap( inbuffer.trh2.sta, inbuffer.trh2.chan, inbuffer.trh2.net, inbuffer.trh2.loc, traceptr->match );
 					}
 					else {
-						if ( scnlfilter_trace_remap( inbuffer.msg, reclogo.type, _match ) ) {
+						if ( scnlfilter_remap( inbuffer.trh2.sta, inbuffer.trh2.chan, inbuffer.trh2.net, inbuffer.trh2.loc, _match ) ) {
 							printf(
 								"pick_tpd: Remap received trace SCNL %s.%s.%s.%s to %s.%s.%s.%s!\n",
 								traceptr->sta, traceptr->chan, traceptr->net, traceptr->loc,

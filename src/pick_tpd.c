@@ -101,7 +101,10 @@ int main ( int argc, char **argv )
 
 /* Check command line arguments */
 	if ( argc != 2 ) {
-		fprintf( stderr, "Usage: pick_tpd <configfile>\n" );
+		fprintf(stderr, "Usage: %s <configfile>\n", PROG_NAME);
+		fprintf(stderr, "Version: %s\n", VERSION);
+		fprintf(stderr, "Author:  %s\n", AUTHOR);
+		fprintf(stderr, "Compiled at %s %s\n", __DATE__, __TIME__);
 		exit( 0 );
 	}
 /* Initialize name of log-file & open it */

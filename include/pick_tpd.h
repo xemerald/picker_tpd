@@ -16,6 +16,14 @@
 /* */
 #include <circ_buf.h>
 
+/**
+ * @name
+ *
+ */
+#define PROG_NAME       "pick_tpd"
+#define VERSION         "1.0.0 - 2024-07-20"
+#define AUTHOR          "Benjamin Ming Yang"
+
 /* Constants define */
 #define  PI     3.141592653589793238462643383279f
 #define  PI2    6.283185307179586476925286766559f

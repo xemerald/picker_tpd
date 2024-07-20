@@ -43,6 +43,7 @@ typedef struct {
 #define CIRC_BUFFER_MAX_ELMS_GET(BUFFER)   ((BUFFER)->max_elements)
 #define CIRC_BUFFER_NUM_ELMS_GET(BUFFER)   ((BUFFER)->num_elements)
 #define CIRC_BUFFER_DATA_GET(BUFFER, POS)  ((BUFFER)->entry[(POS)])
+#define CIRC_BUFFER_DATA_FLUSH(BUFFER)     ((BUFFER)->first = (BUFFER)->last = (BUFFER)->next = (BUFFER)->num_elements = 0)
 
 /**
  * @name

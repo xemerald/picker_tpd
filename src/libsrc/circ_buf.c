@@ -81,6 +81,7 @@ void circ_buf_free( CIRC_BUFFER *circ_buf )
 			circ_buf->entry = NULL;
 		}
 	/* Just in case */
+		circ_buf->first = circ_buf->last = circ_buf->next =
 		circ_buf->max_elements = circ_buf->num_elements = 0;
 	}
 
